@@ -4,167 +4,19 @@
 
 #include "Vector3.hpp"
 #include "Generator.hpp"
+#include "Wire.hpp"
+#include "EndCap.hpp"
+#include "IonizationEvent.hpp"
 
 
-class TrackerGas
-{
 
 
-    private:
-
-        
-    double _ionization_energy_; // first ionization energy of gas atom / molecule
-    double _gamma_mean_free_path_; // assume all energies of photons have same mean free path
-    double _gas_fraction_ionizable_;
-    double _gas_fraction_quenching_;
-
-};
 
 
-class IonizationEvent
-{
-
-    public:
-
-    IonizationEvent(const vector3<double>& position)
-        : _position_{position}
-    {
-
-    }
-
-    private:
-
-    vector3<double> _position_;
-
-};
 
 
-namespace Geometry
-{
-    
-    class Cylinder
-    {
-
-        public:
-
-        Cylinder()
-            : _length_{0.0}
-            , _radius_{0.0}
-        {
-        }
-
-        Cylinder(const vector3<double> &position, const vector3<double> &direction, const double length, const double radius)
-            : _position_{position}
-            , _direction_{direction}
-            , _length_{length}
-            , _radius_{radius}
-        {
-        }
-
-        void Init(const vector3<double> &position, const vector3<double> &direction, const double length, const double radius)
-        {
-            _position_ = position;
-            _direction_ = direction;
-            _length_ = length;
-            _radius_ = radius;
-        }
-
-        private:
-
-        vector3<double> _position_;
-        vector3<double> _direction_;
-        double _length_;
-        double _radius_;
-
-    };
 
 
-} // namespace Geometry
-
-class Wire
-{
-
-    public:
-
-    
-    Wire()
-    {
-    }
-     
-
-    Wire(const vector3<double> &position, const vector3<double> &direction, const double length, const double radius, const double voltage)
-        : _cylinder_(position, direction, length, radius)
-        , _voltage_{voltage}
-    {
-    }
-
-    // init function, works like constructor
-    void Init(const vector3<double> &position, const vector3<double> &direction, const double length, const double radius, const double voltage)
-    {
-        _cylinder_.Init(position, direction, length, radius);
-        _voltage_ = voltage;
-    }
-
-    void SetVoltage(const double voltage)
-    {
-        _voltage_ = voltage;
-    }
-
-    double GetVoltage() const
-    {
-        return _voltage_;
-    }
-
-
-    private:
-
-    Geometry::Cylinder _cylinder_;
-    double _voltage_;
-
-};
-
-
-class EndCap
-{
-
-    public:
-
-    
-    EndCap()
-    {
-    }
-    
-
-    EndCap(const vector3<double> &position, const vector3<double> &direction, const double length, const double radius, const double voltage)
-        : _cylinder_(position, direction, length, radius)
-        , _voltage_{voltage}
-    {
-    }
-
-    // init function, works like constructor
-    void Init(const vector3<double> &position, const vector3<double> &direction, const double length, const double radius, const double voltage)
-    {
-        _cylinder_.Init(position, direction, length, radius);
-        _voltage_ = voltage;
-    }
-
-    void SetVoltage(const double voltage)
-    {
-        _voltage_ = voltage;
-    }
-
-    double GetVoltage() const
-    {
-        return _voltage_;
-    }
-
-
-    private:
-
-    Geometry::Cylinder _cylinder_;
-    double _voltage_;
-
-};
 
 
 
@@ -194,7 +46,30 @@ class Cell
 
     IonizationEvent GenerateIonizationEvent(Generator& generator, const vector3<double>& volume) const
     {
-        vector3<double> event_position{generator.GetRandomPosition(volume)};
+        for(;;)
+        {
+            // generate event within volume
+            vector3<double> event_position{generator.GetRandomPosition(volume)};
+            
+            // check if event is within cell volume
+            // TODO: don't need this because no "track"
+            // when generating muon tracks, this was required
+            // now it is not
+
+            // check x
+            if(_position_.GetX() <= event_position.GetX() && event_position.GetX() < _position_.GetX() + _radius_)
+            {
+                // check y
+                if(_position_.GetY() <= event_position.GetY() && event_position.GetY() < _position_.GetY() + _radius_)
+                {
+                    // check z
+                    if(_position_.GetZ() <= event_position.GetZ() && event_position.GetZ() < _position_.GetZ() + _length_)
+                    {
+                        return event_position;
+                    }
+                }
+            }
+        }
     }
 
 
@@ -226,8 +101,8 @@ class Cell
 
     void init_endcap()
     {
-        _endcap_0_.Init(_position_, _direction_, CELL_ENDCAP_LENGTH, _radius_);
-        _endcap_1_.Init(_position_, -_direction_, CELL_ENDCAP_LENGTH, _radius_); // TODO radius should be slightly smaller
+        _endcap_0_.Init(_position_, _direction_, CELL_ENDCAP_LENGTH, _radius_, 0.0);
+        _endcap_1_.Init(_position_, -_direction_, CELL_ENDCAP_LENGTH, _radius_, 0.0); // TODO radius should be slightly smaller
     }
 
 
@@ -256,44 +131,6 @@ class Cell
 
 };
 
-
-// global definitions of tracker cell size
-const double TRACKER_CELL_LENGTH{2.900};
-const double TRACKER_CELL_X{0.040}; // x and y size, also radius
-const double TRACKER_CELL_Y{TRACKER_CELL_X};
-
-const double TRACKER_CELL_ANODE_WIRE_VOLTAGE{800.0};
-
-
-class World
-{
-
-
-    public:
-
-    World()
-        : _cell_(TRACKER_CELL_LENGTH, TRACKER_CELL_X, TRACKER_CELL_ANODE_WIRE_VOLTAGE) // 2.9 m by 40 mm cell
-        , _volume_(3.0 * TRACKER_CELL_X, 3.0 * TRACKER_CELL_Y, 3.0 * TRACKER_CELL_LENGTH) // world volume
-    {
-        // set cell position to be in center of world volume
-        _cell_.SetPosition(vector3<double>(TRACKER_CELL_X, TRACKER_CELL_Y, TRACKER_CELL_LENGTH));
-    }
-
-
-    void DoEvent()
-    {
-        IonizationEvent event{_cell_.GenerateIonizationEvent(_generator_, _volume_)};
-    }
-
-
-    private:
-
-    Cell _cell_; // world contains a single cell
-    Generator _generator_; // event generator
-
-    // world volume
-    vector3<double> _volume_; // events are generated in this volume
-};
 
 
 #endif // CELL_HPP

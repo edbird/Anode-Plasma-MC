@@ -2,7 +2,8 @@
 
 
 //#include "Vector3.hpp"
-#include "Cell.hpp"
+//#include "Cell.hpp"
+#include "World.hpp"
 
 
 #include <iostream>
@@ -26,6 +27,8 @@ int main(int argc, char* argv[])
     Cell cell(2.900, 0.040, 800.0);
 
     World world;
+    world.DoEvent();
+   
 
     return 0;
 }
