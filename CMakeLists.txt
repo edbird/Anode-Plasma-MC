@@ -6,3 +6,4 @@ ADD_EXECUTABLE(AnodePlasmaMC main.cpp)
 
 # add the vector 3 library folder
 INCLUDE_DIRECTORIES("~/Vector3")
+INCLUDE_DIRECTORIES("include")
