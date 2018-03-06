@@ -29,59 +29,63 @@ class Cell
 
     public:
 
+    // TODO
     Cell(const double length, const double radius, const double anode_voltage)
-        : _position_(0.0, 0.0, 0.0)
-        , _direction_(0.0, 0.0, 1.0) // anode wire points along z
-        , _length_{length}
-        , _radius_{radius}
+        //: _position_(0.0, 0.0, 0.0)
+        //, _direction_(0.0, 0.0, 1.0) // anode wire points along z
+        //: _length_{length}
+        //, _radius_{radius}
+        : _wire_anode_(vector3<double>(0.0, 0.0, 0.0), vector3<double>(0.0, 0.0, 1.0), length, radius, anode_voltage)
     {
         init_wire(anode_voltage);
-        init_endcap();
+        init_endcap(vector3<double>(0.0, 0.0, 0.0), vector3<double>(0.0, 0.0, 1.0), CELL_ENDCAP_LENGTH, radius);
     }
 
     void SetPosition(const vector3<double> position)
     {
-        _position_ = position;
+        std::cout << "TODO" << std::endl;
+        //_position_ = position;
     }
 
     IonizationEvent GenerateIonizationEvent(Generator& generator, const vector3<double>& volume) const
     {
+        vector3<double> event_position;
         for(;;)
         {
             // generate event within volume
-            vector3<double> event_position{generator.GetRandomPosition(volume)};
+            event_position = generator.GetRandomPosition(volume);
             
             // check if event is within cell volume
             // TODO: don't need this because no "track"
             // when generating muon tracks, this was required
             // now it is not
 
-            // check x
-            if(_position_.GetX() <= event_position.GetX() && event_position.GetX() < _position_.GetX() + _radius_)
+            if(_cube_.PointIntersectionTest(event_position))
             {
-                // check y
-                if(_position_.GetY() <= event_position.GetY() && event_position.GetY() < _position_.GetY() + _radius_)
-                {
-                    // check z
-                    if(_position_.GetZ() <= event_position.GetZ() && event_position.GetZ() < _position_.GetZ() + _length_)
-                    {
-                        return event_position;
-                    }
-                }
+                break;
             }
+
         }
+        return IonizationEvent(event_position, (uint64_t)1);
     }
 
 
     private:
 
+    
     void init_wire(const double anode_voltage)
     {
         // initialized anode wire
-        _wire_anode_.Init(_position_, _direction_, _length_, _radius_, anode_voltage);
+        //_wire_anode_.Init(_position_, _direction_, _length_, _radius_, anode_voltage);
+        //_wire_anode_.SetVoltage(anode_voltage);
         
         // initialize ground wire vector
         _wire_ground_.clear();
+
+        vector3<double> position{_wire_anode_.GetCylinder().Position()};
+        vector3<double> direction{_wire_anode_.GetCylinder().Direction()};
+        double length{_cube_.Size().GetZ()};
+        double radius{0.5 * _cube_.Size().GetX()};
 
         for(int y{-1}; y <= 1; ++ y)
         {
@@ -89,27 +93,29 @@ class Cell
             {
                 if(x == 0 && y == 0) continue;
 
-                vector3<double> position{_position_};
-                const vector3<double> x_delta(0.5 * _radius_, 0.0, 0.0);
-                const vector3<double> y_delta(0.0, 0.5 * _radius_, 0.0);
+                //vector3<double> position{_position_};
+                const vector3<double> x_delta(0.5 * radius, 0.0, 0.0);
+                const vector3<double> y_delta(0.0, 0.5 * radius, 0.0);
                 position += x * x_delta;
                 position += y * y_delta;
-                _wire_ground_.push_back(Wire(position, _direction_, _length_, _radius_, 0.0));
+                _wire_ground_.push_back(Wire(position, direction, length, radius, 0.0));
             }
         }
     }
 
-    void init_endcap()
+    void init_endcap(const vector3<double>& position, const vector3<double> direction, const double length, const double radius)
     {
-        _endcap_0_.Init(_position_, _direction_, CELL_ENDCAP_LENGTH, _radius_, 0.0);
-        _endcap_1_.Init(_position_, -_direction_, CELL_ENDCAP_LENGTH, _radius_, 0.0); // TODO radius should be slightly smaller
+        _endcap_0_.Init(position, direction, length, radius, 0.0);
+        _endcap_1_.Init(position, -direction, length, radius, 0.0); // TODO radius should be slightly smaller
     }
+    
 
 
-    vector3<double> _position_; // vector to anode wire start position
-    vector3<double> _direction_; // unit vector in direction along anode wire
-    double _length_;
-    double _radius_;
+    //vector3<double> _position_; // vector to anode wire start position
+    //vector3<double> _direction_; // unit vector in direction along anode wire
+    //double _length_;
+    //double _radius_;
+    Geometry::Cube _cube_; // cell volume
     const double _ACTIVE_RADIUS_FRACTION_{0.9}; // the active radius is 
 
     Wire _wire_anode_;

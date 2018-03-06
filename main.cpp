@@ -5,6 +5,11 @@
 //#include "Cell.hpp"
 #include "World.hpp"
 
+//#include "Generator.hpp"
+//#include "Wire.hpp"
+//#include "EndCap.hpp"
+//#include "IonizationEvent.hpp"
+//#include "Cell.hpp"
 
 #include <iostream>
 #include <sstream>
@@ -23,6 +28,11 @@ int main(int argc, char* argv[])
     b += a;
     std::cout << "a=" << a << " b=" << b << std::endl;
     */
+
+    //Generator generator;
+    //Wire wire;
+    //EndCap endcap;
+    //IonizationEvent ionizationevent(vector3<double>(0.0, 0.0, 0.0));
 
     Cell cell(2.900, 0.040, 800.0);
 

@@ -40,6 +40,11 @@ class Wire
         return _voltage_;
     }
 
+    const Geometry::Cylinder& GetCylinder() const
+    {
+        return _cylinder_;
+    }
+
 
     private:
 
