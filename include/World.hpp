@@ -3,6 +3,8 @@
 
 #include "Vector3.hpp"
 #include "Cell.hpp"
+#include "Generator.hpp"
+#include "IonizationEvent.hpp"
 
 
 // global definitions of tracker cell size
@@ -20,8 +22,9 @@ class World
     public:
 
     World()
-        : _cell_(TRACKER_CELL_LENGTH, TRACKER_CELL_X, TRACKER_CELL_ANODE_WIRE_VOLTAGE) // 2.9 m by 40 mm cell
+        : _cell_(TRACKER_CELL_LENGTH, 0.5 * TRACKER_CELL_X, TRACKER_CELL_ANODE_WIRE_VOLTAGE) // 2.9 m by 40 mm cell
         , _volume_(3.0 * TRACKER_CELL_X, 3.0 * TRACKER_CELL_Y, 3.0 * TRACKER_CELL_LENGTH) // world volume
+        //: _volume_(3.0 * TRACKER_CELL_X, 3.0 * TRACKER_CELL_Y, 3.0 * TRACKER_CELL_LENGTH) // world volume
     {
         // set cell position to be in center of world volume
         _cell_.SetPosition(vector3<double>(TRACKER_CELL_X, TRACKER_CELL_Y, TRACKER_CELL_LENGTH));

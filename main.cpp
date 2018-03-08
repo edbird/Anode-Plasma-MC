@@ -34,7 +34,7 @@ int main(int argc, char* argv[])
     //EndCap endcap;
     //IonizationEvent ionizationevent(vector3<double>(0.0, 0.0, 0.0));
 
-    Cell cell(2.900, 0.040, 800.0);
+    //Cell cell(2.900, 0.040, 800.0);
 
     World world;
     world.DoEvent();
