@@ -2,7 +2,7 @@
 #define WIRE_HPP
 
 
-#include "Vector3.hpp"
+#include "vector3.hpp"
 #include "Geometry.hpp"
 
 

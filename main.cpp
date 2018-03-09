@@ -37,7 +37,8 @@ int main(int argc, char* argv[])
     //Cell cell(2.900, 0.040, 800.0);
 
     World world;
-    world.DoEvent();
+    for(int i = 0; i < 10000; ++ i)
+        world.DoEvent();
    
 
     return 0;

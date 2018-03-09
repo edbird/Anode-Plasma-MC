@@ -2,7 +2,7 @@
 #define GEOMETRY_HPP
 
 
-#include "Vector3.hpp"
+#include "vector3.hpp"
 
 
 namespace Geometry
@@ -43,6 +43,11 @@ namespace Geometry
         const vector3<double>& Position() const
         {
             return _position_;
+        }
+
+        void SetPosition(const vector3<double>& position)
+        {
+            _position_ = position;
         }
 
         private:
@@ -186,15 +191,25 @@ namespace Geometry
         {
         }
 
-        Cube(const vector3<double> &position, const vector3<double>& direction_x, const vector3<double>& direction_y)
-            : Volume(position)
+        Cube(const vector3<double>& size)
+            : _size_{size}
+            , Volume(vector3<double>(0.0, 0.0, 0.0))
+            , _direction_x_{vector3<double>(1.0, 0.0, 0.0)}
+            , _direction_y_{vector3<double>(0.0, 1.0, 0.0)}
+        {
+        }
+
+        Cube(const vector3<double> &size, const vector3<double>& position, const vector3<double>& direction_x, const vector3<double>& direction_y)
+            : _size_{size}
+            , Volume(position)
             , _direction_x_{direction_x}
             , _direction_y_{direction_y}
         {
         }
 
-        void Init(const vector3<double>& position, const vector3<double>& direction_x, const vector3<double> &direction_y)
+        void Init(const vector3<double>& size, const vector3<double>& position, const vector3<double>& direction_x, const vector3<double> &direction_y)
         {
+            _size_ = size;
             Volume::Init(position);
             _direction_x_ = direction_x;
             _direction_y_ = direction_y;
@@ -204,7 +219,6 @@ namespace Geometry
         {
             return _size_;
         }
-
 
         // TODO: use cross product
         const vector3<double> Direction() const

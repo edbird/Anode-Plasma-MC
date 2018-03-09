@@ -2,7 +2,7 @@
 #define IONIZATIONEVENT_HPP
 
 
-#include "Vector3.hpp"
+#include "vector3.hpp"
 
 // TODO: check that this class does the following
 // stores charge as electron integer type if set is called with
@@ -251,6 +251,8 @@ class ElectronicCharge
     const uint64_t _uint64_t_max_{std::numeric_limits<uint64_t>::max()}; // 9223372036854775807
     const double _max_electron_count_uint64_as_double_{((double)_uint64_t_max_ - 0.5) * _electron_charge_fundamental_};
 
+    public:
+    const double ELECTRON_CHARGE{-_electron_charge_fundamental_};
 };
 
 

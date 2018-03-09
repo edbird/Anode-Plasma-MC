@@ -1,7 +1,7 @@
 #ifndef WORLD_HPP
 #define WORLD_HPP
 
-#include "Vector3.hpp"
+#include "vector3.hpp"
 #include "Cell.hpp"
 #include "Generator.hpp"
 #include "IonizationEvent.hpp"
@@ -22,8 +22,9 @@ class World
     public:
 
     World()
-        : _cell_(TRACKER_CELL_LENGTH, 0.5 * TRACKER_CELL_X, TRACKER_CELL_ANODE_WIRE_VOLTAGE) // 2.9 m by 40 mm cell
-        , _volume_(3.0 * TRACKER_CELL_X, 3.0 * TRACKER_CELL_Y, 3.0 * TRACKER_CELL_LENGTH) // world volume
+        : _volume_(3.0 * TRACKER_CELL_X, 3.0 * TRACKER_CELL_Y, 3.0 * TRACKER_CELL_LENGTH) // world volume
+        , _cell_(TRACKER_CELL_LENGTH, 0.5 * TRACKER_CELL_X, TRACKER_CELL_ANODE_WIRE_VOLTAGE, _volume_) // 2.9 m by 40 mm cell
+        //, _volume_(3.0 * TRACKER_CELL_X, 3.0 * TRACKER_CELL_Y, 3.0 * TRACKER_CELL_LENGTH) // world volume
         //: _volume_(3.0 * TRACKER_CELL_X, 3.0 * TRACKER_CELL_Y, 3.0 * TRACKER_CELL_LENGTH) // world volume
     {
         // set cell position to be in center of world volume
@@ -35,16 +36,19 @@ class World
     {
         IonizationEvent event{_cell_.GenerateIonizationEvent(_generator_, _volume_)};
         std::cout << event.GetPosition() << std::endl;
+
+        // step the electron
     }
 
 
     private:
 
+    // world volume
+    vector3<double> _volume_; // events are generated in this volume
+    
     Cell _cell_; // world contains a single cell
     Generator _generator_; // event generator
 
-    // world volume
-    vector3<double> _volume_; // events are generated in this volume
 };
 
 

@@ -2,7 +2,7 @@
 #define CELL_HPP
 
 
-#include "Vector3.hpp"
+#include "vector3.hpp"
 #include "Generator.hpp"
 #include "Wire.hpp"
 #include "EndCap.hpp"
@@ -16,26 +16,37 @@
 
 
 const double CELL_ENDCAP_LENGTH{0.1}; // 100 mm
-
+const double WIRE_RADIUS{1.0e-6}; // 1 um
 
 class Cell
 {
 
-
     public:
 
-    // TODO 
-    Cell(const double length, const double radius, const double anode_voltage)
+    // volume is the world volume used for generating points for events
+    Cell(const double length, const double radius, const double anode_voltage, const vector3<double>& volume)
         //: _position_(0.0, 0.0, 0.0)
         //, _direction_(0.0, 0.0, 1.0) // anode wire points along z
         //: _length_{length}
         //, _radius_{radius}
-        : _wire_anode_(vector3<double>(0.0, 0.0, 0.0), vector3<double>(0.0, 0.0, 1.0), length, radius, anode_voltage)
+        : _cube_(vector3<double>(2.0 * radius, 2.0 * radius, length))
+        , _wire_anode_(vector3<double>(radius, radius, 0.0), vector3<double>(0.0, 0.0, 1.0), length, WIRE_RADIUS, anode_voltage)
         , _tfile_{new TFile("Cell_output.root", "recreate")}
-        , _histogram_group_(_tfile_, HistogramGroupProperties("", "."), HistogramProperties(100, -5.0 * radius, 5.0 * radius))
+        , _histogram_group_(_tfile_, HistogramGroupProperties("", "."), HistogramProperties(100, 0.0, 1.0))
     {
+
+        DEBUG_MESSAGE(function_debug_arguments(__PRETTY_FUNCTION__, "volume", volume.String()));
+
+        // set position of cube (volume of cell)
+        _cube_.SetPosition(vector3<double>(2.0 * radius, 2.0 * radius, length));
+
         init_wire(anode_voltage);
-        init_endcap(vector3<double>(0.0, 0.0, 0.0), vector3<double>(0.0, 0.0, 1.0), CELL_ENDCAP_LENGTH, radius);
+        vector3<double> position(0.0, 0.0, 0.0);
+        position += _cube_.Position();
+        init_endcap(position, vector3<double>(0.0, 0.0, 1.0), CELL_ENDCAP_LENGTH, radius);
+
+        // initialize the electric field
+        init_electric_field();
 
         //f = new TFile("Cell_output.root");
         //t = new TTree("celloutput");
@@ -43,14 +54,12 @@ class Cell
         //h_event_pos_y = new TH1F("h_event_pos_y", "h_event_pos_y", 100, -5.0 * radius, 5.0 * radius);
         //h_event_pos_z = new TH1F("h_event_pos_z", "h_event_pos_z", 100, -5.0 * length, 5.0 * length);
 
-        _histogram_group_.Add("h_event_pos_x", 100, -5.0 * radius, 5.0 * radius);
-        _histogram_group_.Add("h_event_pos_y", 100, -5.0 * radius, 5.0 * radius);
-        _histogram_group_.Add("h_event_pos_z", 100, -5.0 * length, 5.0 * length);
+        _histogram_group_.Add("h_event_pos_x", 100, 0.0, volume.GetX());
+        _histogram_group_.Add("h_event_pos_y", 100, 0.0, volume.GetY());
+        _histogram_group_.Add("h_event_pos_z", 100, 0.0, volume.GetZ());
 
         //_tfile_->SetDirectory(0);
 
-        std::cout << "radius=" << radius << std::endl;
-        std::cin.get();
     }
 
     ~Cell()
@@ -86,6 +95,53 @@ class Cell
     }
     */
     
+    void init_electric_field()
+    {
+
+    }
+
+    // convert radial distance from anode wire to voltage (electric potential)
+    double V_radiual(const double radial_position)
+    {
+        const double radius{_cube_.Size().GetX() / 2.0};
+        const double wire_radius{_wire_anode_.GetCylinder().Radius()};
+        const double ln_R{std::log(radius)};
+        const double ln_r0{std::log(wire_radius)};
+        const double ln_r{std::log(radial_position)}
+        const double V0{_wire_anode_.GetVoltage()};
+        return V0 * ((ln_R - ln_r) / (ln_R - ln_r0));
+    }
+
+    // for electron, solve for radial position, given a required energy gain
+    // and an initial radial position
+    bool solve_radial(double& output_radial_position, const double radial_position, const double energy_drop)
+    {
+        const double e{ElectronicCharge::ELECTRON_CHARGE};
+        // TODO check solution exists
+    }
+
+    double electric_potential(vector3<double> position)
+    {
+
+    }
+
+    vector3<double> electric_field(vector3<double> position)
+    {
+        // subtract relative position of cell volume
+        position -= _cube_.Position();
+
+        // anode wire position
+        // this is relative to the cube position
+        vector3<double> anode_wire_position{_wire_anode_.Position()};
+
+        vector3<double> field_e;
+
+        double electric_field_magnitude
+
+        field_e = anode_wire_position - position;
+        field_e *= electric_field_magnitude;
+
+    }
 
     
     void SetPosition(const vector3<double> position)
@@ -111,9 +167,6 @@ class Cell
             _histogram_group_.Ref("h_event_pos_y").Get()->Fill(event_position.GetY());
             _histogram_group_.Ref("h_event_pos_z").Get()->Fill(event_position.GetZ());
             */
-            _histogram_group_.Ref("h_event_pos_x").Get().Fill(event_position.GetX());
-            _histogram_group_.Ref("h_event_pos_y").Get().Fill(event_position.GetY());
-            _histogram_group_.Ref("h_event_pos_z").Get().Fill(event_position.GetZ());
             
             // check if event is within cell volume
             // TODO: don't need this because no "track"
@@ -122,6 +175,10 @@ class Cell
 
             if(_cube_.PointIntersectionTest(event_position))
             {
+                _histogram_group_.Ref("h_event_pos_x").Get().Fill(event_position.GetX());
+                _histogram_group_.Ref("h_event_pos_y").Get().Fill(event_position.GetY());
+                _histogram_group_.Ref("h_event_pos_z").Get().Fill(event_position.GetZ());
+
                 break;
             }
 
@@ -160,7 +217,7 @@ class Cell
                 const vector3<double> y_delta(0.0, 0.5 * radius, 0.0);
                 position += x * x_delta;
                 position += y * y_delta;
-                _wire_ground_.push_back(Wire(position, direction, length, radius, 0.0));
+                _wire_ground_.push_back(Wire(position, direction, length, WIRE_RADIUS, 0.0));
             }
         }
     }

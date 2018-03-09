@@ -2,7 +2,7 @@
 #define GENERATOR_HPP
 
 
-#include "Vector3.hpp"
+#include "vector3.hpp"
 
 
 #include <random>
