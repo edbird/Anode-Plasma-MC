@@ -8,6 +8,8 @@
 #include "EndCap.hpp"
 #include "IonizationEvent.hpp"
 
+#include "function_debug.hpp"
+
 #include "HistogramWrapper.hpp"
 
 #include <TFile.h>
@@ -60,10 +62,19 @@ class Cell
 
         //_tfile_->SetDirectory(0);
 
+        h_perpendicular_distance = new TH1F("h_perpendicular_distance", "h_perpendicular_distance", 100, -0.1, 0.5);
+
     }
 
     ~Cell()
     {
+        h_perpendicular_distance->Write();
+
+        TCanvas* c = new TCanvas("c_perpendicular_distance", "c_perpendicular_distance", 800, 600);
+        h_perpendicular_distance->Draw();
+        c->SaveAs("c_perpendicular_distance.png");
+        delete c;
+
         //Canvas(h_event_pos_x, "h_event_pos_x");
         //Canvas(h_event_pos_y, "h_event_pos_y");
         //Canvas(h_event_pos_z, "h_event_pos_z");
@@ -107,7 +118,7 @@ class Cell
         const double wire_radius{_wire_anode_.GetCylinder().Radius()};
         const double ln_R{std::log(radius)};
         const double ln_r0{std::log(wire_radius)};
-        const double ln_r{std::log(radial_position)}
+        const double ln_r{std::log(radial_position)};
         const double V0{_wire_anode_.GetVoltage()};
         return V0 * ((ln_R - ln_r) / (ln_R - ln_r0));
     }
@@ -122,6 +133,17 @@ class Cell
 
     double electric_potential(vector3<double> position)
     {
+        vector3<double> wire_position{_wire_anode_.GetCylinder().Position()};
+        vector3<double> wire_direction{_wire_anode_.GetCylinder().Direction()};
+        vector3<double> delta_position{position - wire_position};
+        // TODO: derive this algorithm and optimize
+        double distance_along{dot(delta_position, wire_direction)};
+        vector3<double> perpendicular{delta_position - distance_along * wire_direction};
+        double perpendicular_distance{perpendicular.Length()};
+
+        std::cout << "perpendicular_distance=" << perpendicular_distance << std::endl;
+
+        h_perpendicular_distance->Fill(perpendicular_distance);
 
     }
 
@@ -132,11 +154,11 @@ class Cell
 
         // anode wire position
         // this is relative to the cube position
-        vector3<double> anode_wire_position{_wire_anode_.Position()};
+        vector3<double> anode_wire_position{_wire_anode_.GetCylinder().Position()};
 
         vector3<double> field_e;
 
-        double electric_field_magnitude
+        double electric_field_magnitude{0.0}; // TODO
 
         field_e = anode_wire_position - position;
         field_e *= electric_field_magnitude;
@@ -263,6 +285,8 @@ class Cell
     //TH1F *h_event_pos_z;
    
     mutable HistogramGroupFloat _histogram_group_;
+
+    mutable TH1F *h_perpendicular_distance;
 
 };
 

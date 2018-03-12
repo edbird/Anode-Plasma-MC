@@ -36,6 +36,7 @@ class World
     {
         IonizationEvent event{_cell_.GenerateIonizationEvent(_generator_, _volume_)};
         std::cout << event.GetPosition() << std::endl;
+        std::cout << "V " << _cell_.electric_potential(event.GetPosition()) << " [volts]" << std::endl;
 
         // step the electron
     }

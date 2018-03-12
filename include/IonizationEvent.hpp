@@ -245,14 +245,14 @@ class ElectronicCharge
     uint64_t _electron_;
 
     // physics constant e, fundamental unit of electronic charge in coulomb
-    const double _electron_charge_fundamental_{1.6021766208e-19};
+    static constexpr const double _electron_charge_fundamental_{1.6021766208e-19};
     // the maximum charge that can be stored in both double format
     // and uint64_t format without overflow in uint64_t
-    const uint64_t _uint64_t_max_{std::numeric_limits<uint64_t>::max()}; // 9223372036854775807
-    const double _max_electron_count_uint64_as_double_{((double)_uint64_t_max_ - 0.5) * _electron_charge_fundamental_};
+    static constexpr const uint64_t _uint64_t_max_{std::numeric_limits<uint64_t>::max()}; // 9223372036854775807
+    static constexpr const double _max_electron_count_uint64_as_double_{((double)_uint64_t_max_ - 0.5) * _electron_charge_fundamental_};
 
     public:
-    const double ELECTRON_CHARGE{-_electron_charge_fundamental_};
+    static constexpr const double ELECTRON_CHARGE{-_electron_charge_fundamental_};
 };
 
 
