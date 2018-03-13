@@ -18,7 +18,7 @@
 
 
 const double CELL_ENDCAP_LENGTH{0.1}; // 100 mm
-const double WIRE_RADIUS{1.0e-6}; // 1 um
+const double WIRE_RADIUS{4.0e-5}; // 40 um
 
 class Cell
 {
@@ -35,6 +35,8 @@ class Cell
         , _wire_anode_(vector3<double>(radius, radius, 0.0), vector3<double>(0.0, 0.0, 1.0), length, WIRE_RADIUS, anode_voltage)
         , _tfile_{new TFile("Cell_output.root", "recreate")}
         , _histogram_group_(_tfile_, HistogramGroupProperties("", "."), HistogramProperties(100, 0.0, 1.0))
+        , properties("h_ionization_count_wrapper", 100, 0.0, 2.0e4)
+        , h_ionization_count_wrapper(_tfile_, properties)
     {
 
         DEBUG_MESSAGE(function_debug_arguments(__PRETTY_FUNCTION__, "volume", volume.String()));
@@ -62,14 +64,48 @@ class Cell
 
         //_tfile_->SetDirectory(0);
 
-        h_perpendicular_distance = new TH1F("h_perpendicular_distance", "h_perpendicular_distance", 100, -0.1, 0.5);
+        h_perpendicular_distance = new TH1F("h_perpendicular_distance", "h_perpendicular_distance", 100, 0.0, 0.05);
 
+        h_cell_voltage = new TH1F("h_cell_voltage", "h_cell_voltage", 100000, 0.0, 0.020);
+
+        for(Int_t i{1}; i <= h_cell_voltage->GetNbinsX(); ++ i)
+        {
+            Double_t radial_position{h_cell_voltage->GetBinCenter(i)};
+            Double_t voltage{V_radial(radial_position)};
+            h_cell_voltage->SetBinContent(i, voltage);
+        }
+
+        h_event_initial_voltage = new TH1F("h_event_initial_voltage", "h_event_initial_voltage", 100, 0.0, 2000.0);
+
+        h_ionization_count = new TH1F("h_ionization_count", "h_ionization_count", 100, 0.0, 2.0e4);
     }
 
     ~Cell()
     {
-        h_perpendicular_distance->Write();
+        h_ionization_count_wrapper.Write();
+        h_ionization_count_wrapper.Canvas();
 
+        h_ionization_count->Write();
+        TCanvas* c_ionization_count = new TCanvas("c_ionization_count", "c_ionization_count", 800, 600);
+        c_ionization_count->SetLogy();
+        h_ionization_count->Draw();
+        c_ionization_count->SaveAs("c_ionization_count.png");
+        delete c_ionization_count; 
+        
+        h_event_initial_voltage->Write();
+        TCanvas* c_event_initial_voltage = new TCanvas("c_event_initial_voltage", "c_event_initial_voltage", 800, 600);
+        c_event_initial_voltage->SetLogy();
+        h_event_initial_voltage->Draw();
+        c_event_initial_voltage->SaveAs("c_event_initial_voltage.png");
+        delete c_event_initial_voltage; 
+
+        h_cell_voltage->Write();
+        TCanvas* c_cell_voltage = new TCanvas("c_cell_voltage", "c_cell_voltage", 800, 600);
+        h_cell_voltage->Draw();
+        c_cell_voltage->SaveAs("c_cell_voltage.png");
+        delete c_cell_voltage; 
+
+        h_perpendicular_distance->Write();
         TCanvas* c = new TCanvas("c_perpendicular_distance", "c_perpendicular_distance", 800, 600);
         h_perpendicular_distance->Draw();
         c->SaveAs("c_perpendicular_distance.png");
@@ -79,13 +115,13 @@ class Cell
         //Canvas(h_event_pos_y, "h_event_pos_y");
         //Canvas(h_event_pos_z, "h_event_pos_z");
 
+        _histogram_group_.Write();
         _histogram_group_.Canvas();
-
+        
         //h_event_pos_x->Write();
         //h_event_pos_y->Write();
         //h_event_pos_z->Write();
 
-        _histogram_group_.Write();
 
         //t->Write();
         _tfile_->Close();
@@ -113,23 +149,122 @@ class Cell
 
     // convert radial distance from anode wire to voltage (electric potential)
     // radial position is relative to the anode wire position
-    double V_radiual(const double radial_position)
+    double V_radial(const double radial_position)
     {
-        const double radius{_cube_.Size().GetX() / 2.0};
+        
+        //DEBUG_MESSAGE(function_debug_arguments(__PRETTY_FUNCTION__, "radial_position", radial_position));
+
+        // wire voltage
+        const double V0{_wire_anode_.GetVoltage()};
+
+        // wire radius
         const double wire_radius{_wire_anode_.GetCylinder().Radius()};
+        // cell radius
+        // TODO: assumed radial field configuration THIS IS WRONG
+        const double radius{_cube_.Size().GetX() / 2.0}; 
+        
+        // is position is inside wire, return voltage of wire
+        // TODO: no check before this function call to check if position is
+        // valid (inside wire)
+        if(radial_position <= wire_radius)
+        {
+            return V0;
+        }
+        else if(radial_position >= radius)
+        {
+            return 0.0;
+        }
+        
+        // compute potential if outside wire
         const double ln_R{std::log(radius)};
         const double ln_r0{std::log(wire_radius)};
         const double ln_r{std::log(radial_position)};
-        const double V0{_wire_anode_.GetVoltage()};
+
+        //DEBUG_MESSAGE(function_debug_locals(__PRETTY_FUNCTION__, "wire_radius", wire_radius, "radius", radius, "ln_R", ln_R, "ln_r0", ln_r0, "ln_r", ln_r));
+
         return V0 * ((ln_R - ln_r) / (ln_R - ln_r0));
+
     }
 
     // for electron, solve for radial position, given a required energy gain
     // and an initial radial position
+    // energy drop specified in electron volt
     bool solve_radial(double& output_radial_position, const double radial_position, const double energy_drop)
     {
+        // electron charge
         const double e{ElectronicCharge::ELECTRON_CHARGE};
-        // TODO check solution exists
+
+        // anode wire voltage constant
+        const double V0{_wire_anode_.GetVoltage()};
+
+        // delta_E / (e * V0)
+        //const double k{energy_drop / (e * V0)}; // joule
+        const double k{energy_drop / (1.0 * V0)}; // eV
+
+        // wire radius
+        const double r0{_wire_anode_.GetCylinder().Radius()};
+
+        // maximum radius
+        const double R{_cube_.Size().GetX() / 2.0};
+
+        // radius ratio
+        const double r_frac{r0 / R};
+
+        // multiplier
+        const double mult{std::pow(r_frac, k)};
+
+        // TODO: mult is a constant - make static, member of Cell
+
+        // solution
+        const double r_final{radial_position * mult};
+
+        //DEBUG_MESSAGE(function_debug_locals(__PRETTY_FUNCTION__, "e", e, "V0", V0, "k", k, "r0", r0, "R", R, "r_frac", r_frac, "mult", mult, "radial_position", radial_position, "r_final", r_final));
+
+        // check if solution exists / is valid
+        if(r_final < r0)
+        {
+            return false;
+        }
+        
+        // solution exists
+        output_radial_position = r_final;
+
+        return true;
+
+
+        // TODO: inefficient if voltage already calculated
+
+        //const double voltage_initial{V_radial(radial_position)};
+        //const double energy_initial{e * voltage_initial};
+        //const double energy_final{};
+    }
+    
+    bool solve_radial_and_energy(double& output_radial_position, double& output_energy, const double radial_position, const double energy, const double energy_drop)
+    {
+        // solve radial position
+        if(solve_radial(output_radial_position, radial_position, energy_drop) == false)
+        {
+            // solution does not exist
+            return false;
+        }
+        
+        // solution exists
+        // compute energy gain
+        // output = input + gain due to potential - ionization
+        // all units are eV
+        const double energy_gain{V_radial(output_radial_position) - V_radial(radial_position)};
+        //std::cout << "the energy gain is " << energy_gain << " eV" << std::endl;
+        //std::cin.get();
+        // TODO: This always returns 24.something eV, as this is the ionization energy
+        // an over-constrained problem?
+        // what about when initial energy non-zero?
+
+        // TODO
+        // not yet using gas mean free path information!
+
+        output_energy = energy + energy_gain - energy_drop;
+
+        return true;
     }
 
     // position is relative to the global origin
@@ -149,14 +284,91 @@ class Cell
         vector3<double> perpendicular{delta_position - distance_along * wire_direction};
         double perpendicular_distance{perpendicular.Length()};
 
+        /*
         std::cout << "wire_position=" << wire_position + cell_position << std::endl;
         std::cout << "wire_direction=" << wire_direction << std::endl;
         std::cout << "delta_position=" << delta_position << std::endl;
         std::cout << "distance_along=" << distance_along << std::endl;
         std::cout << "perpendicular=" << perpendicular << std::endl;
         std::cout << "perpendicular_distance=" << perpendicular_distance << std::endl;
+        */
 
         h_perpendicular_distance->Fill(perpendicular_distance);
+        
+        double voltage{V_radial(perpendicular_distance)};
+        h_event_initial_voltage->Fill(voltage);
+        // solve to find radial position of next ionization event
+        double next_radial{0.0};
+        double next_energy;
+
+        // https://physics.nist.gov/PhysRefData/Handbook/Tables/heliumtable1.htm
+        const double HELIUM_IONIZATION_ENERGY{24.587387}; // eV 
+        double ionization_energy{85.7}; // fake ionization energy eV //{HELIUM_IONIZATION_ENERGY};
+        int ionization_count{0};
+
+        // structure containing radial positions of electrons
+        std::vector<double> electron_radial_position;
+        // put the ionization position into this structure
+        // contains "a single electron"
+        electron_radial_position.push_back(perpendicular_distance);
+
+        // electron energy
+        std::vector<double> electron_energy;
+        electron_energy.push_back(0.0); // initially no energy
+
+        // process all electrons
+        //std::vector<double>::iterator it{electron_radial_position.begin()};
+        //for(; it != electron_radial_position.end(); ++ it)
+        // NOTE: do not use iterator as vector is reallocated!
+        for(std::size_t ix{0}; ix < electron_radial_position.size(); ++ ix)
+        {
+            // set the initial radial value of this electron
+            //double initial_radial{*it};
+            double initial_radial{electron_radial_position[ix]};
+            double initial_energy{electron_energy[ix]};
+            //std::cout << "initial_radial=" << initial_radial << std::endl;
+            //std::cin.get();
+
+            double ionization_energy_minus_kinetic_energy{ionization_energy - initial_energy};
+            if(ionization_energy_minus_kinetic_energy < 0.0) ionization_energy_minus_kinetic_energy = 0.0;
+
+            // solve for radial position
+            while(solve_radial_and_energy(next_radial, next_energy, initial_radial, initial_energy, ionization_energy_minus_kinetic_energy))
+            //while(solve_radial(next_radial, initial_radial, ionization_energy_minus_kinetic_energy))
+            {
+                // if there was a solution, then an ionization event occured
+                // TODO: store the kinetic energy / velocity as well as position
+                ++ ionization_count;
+                //std::cout << "next ionization occurs at position: " << next_radial << std::endl;
+
+                // compute remaining energy
+                //next_energy{initial_energy + energy_gain};
+                //energy_gain = 0.0;
+
+                // add new electron to vector at this position
+                electron_radial_position.push_back(next_radial);
+                electron_energy.push_back(next_energy);
+
+                // reset the while loop, try to find another solution
+                initial_radial = next_radial;
+                next_radial = 0.0;
+                initial_energy = next_energy;
+                next_energy = 0.0;
+
+            }
+            // when this loop ends, some new electrons may have been added to
+            // the vector
+
+            //std::cout << "NEXT ELECTRON" << std::endl;
+        
+            //std::cout << "electron: ix=" << ix << " ionization_count=" << ionization_count << std::endl;
+        }
+
+        h_ionization_count->Fill(ionization_count);
+
+        h_ionization_count_wrapper.Ref().Fill(ionization_count);
+
+        return voltage;
 
     }
 
@@ -307,6 +519,14 @@ class Cell
     mutable HistogramGroupFloat _histogram_group_;
 
     mutable TH1F *h_perpendicular_distance;
+    
+    mutable TH1F *h_cell_voltage;
+    
+    mutable TH1F *h_event_initial_voltage;
+
+    mutable TH1F *h_ionization_count;
+    HistogramProperties properties;
+    HistogramWrapperFloat h_ionization_count_wrapper;
 
 };
 

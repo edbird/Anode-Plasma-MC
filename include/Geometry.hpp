@@ -234,6 +234,8 @@ namespace Geometry
         bool PointIntersectionTest(vector3<double> point) const
         {
 
+            #define POINTINTERSECTIONTEST_DEBUG 0
+
             point -= Volume::Position();
             // TODO rotation
 
@@ -246,9 +248,12 @@ namespace Geometry
                     // check z
                     if(0.0 <= point.GetZ() && point.GetZ() < _size_.GetZ())
                     {
+                        #if POINTINTERSECTIONTEST_DEBUG
                         std::cout << __func__ << " return true; point=" << point << std::endl;
+                        #endif
                         return true;
                     }
+                    #if POINTINTERSECTIONTEST_DEBUG
                     else
                     {
                         std::cerr << "PointIntersectionTest: test Z failed: z=" << point.GetZ() << " range=[" << 0.0 << "," << _size_.GetZ() << "]";
@@ -258,7 +263,9 @@ namespace Geometry
                             std::cerr << " !" << point.GetZ() << " < " << _size_.GetZ();
                         std::cerr << std::endl;
                     }
+                    #endif
                 }
+                #if POINTINTERSECTIONTEST_DEBUG
                 else
                 {
                     std::cerr << "PointIntersectionTest: test Y failed: y=" << point.GetY() << " range=[" << 0.0 << "," << _size_.GetY() << "]";
@@ -268,7 +275,9 @@ namespace Geometry
                         std::cerr << " !" << point.GetY() << " < " << _size_.GetY();
                     std::cerr << std::endl;
                 }
+                #endif
             }
+            #if POINTINTERSECTIONTEST_DEBUG
             else
             {
                 std::cerr << "PointIntersectionTest: test X failed: x=" << point.GetX() << " range=[" << 0.0 << "," << _size_.GetX() << "]";
@@ -278,8 +287,11 @@ namespace Geometry
                     std::cerr << " !" << point.GetX() << " < " << _size_.GetX();
                 std::cerr << std::endl;
             }
+            #endif
 
+            #if POINTINTERSECTIONTEST_DEBUG
             std::cout << __func__ << " return false; point=" << point << std::endl;
+            #endif
             return false;
 
         }

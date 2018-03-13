@@ -9,10 +9,10 @@
 
 // global definitions of tracker cell size
 const double TRACKER_CELL_LENGTH{2.900};
-const double TRACKER_CELL_X{0.040}; // x and y size, also radius
+const double TRACKER_CELL_X{0.040}; // x and y size, also 2.0 * radius
 const double TRACKER_CELL_Y{TRACKER_CELL_X};
 
-const double TRACKER_CELL_ANODE_WIRE_VOLTAGE{800.0};
+const double TRACKER_CELL_ANODE_WIRE_VOLTAGE{1800.0};
 
 
 class World
@@ -35,14 +35,16 @@ class World
     void DoEvent()
     {
         IonizationEvent event{_cell_.GenerateIonizationEvent(_generator_, _volume_)};
-        std::cout << "event.GetPosition() -> " << event.GetPosition() << std::endl;
-        std::cout << "V " << _cell_.electric_potential(event.GetPosition()) << " [volts]" << std::endl;
+        //std::cout << "event.GetPosition() -> " << event.GetPosition() << std::endl;
+        //std::cout << "V " << _cell_.electric_potential(event.GetPosition()) << " [volts]" << std::endl;
+        _cell_.electric_potential(event.GetPosition());
+        // TODO: some of these print zero why?
 
         // step the electronvoid
 
 
-        std::cout << "Press enter to continue..." << std::endl;
-        std::cin.get();
+        //std::cout << "Press enter to continue..." << std::endl;
+        //std::cin.get();
     }
 
 
