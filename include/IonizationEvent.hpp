@@ -291,4 +291,51 @@ class IonizationEvent
 
 };
 
+
+class Ion
+{
+
+    public:
+
+    Ion()
+    {
+    }
+
+    virtual
+    double Charge() const
+    {
+        return _charge_;
+    }
+
+
+    private:
+
+    double _charge_;
+
+};
+
+
+class Electron : public Ion
+{
+
+    public:
+
+    Electron(const vector3<double> position, const double kinetic_energy)
+        : _position_{position}, _kinetic_energy_{kinetic_energy}
+    {
+    }
+
+    ~Electron()
+    {
+    }
+
+
+    private:
+
+    vector3<double> _position_;
+    double _kinetic_energy_;
+
+
+};
+
 #endif // IONIZATIONEVENT_HPP
