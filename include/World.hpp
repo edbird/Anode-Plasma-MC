@@ -23,7 +23,7 @@ class World
 
     World()
         : _volume_(3.0 * TRACKER_CELL_X, 3.0 * TRACKER_CELL_Y, 3.0 * TRACKER_CELL_LENGTH) // world volume
-        , _cell_(TRACKER_CELL_LENGTH, 0.5 * TRACKER_CELL_X, TRACKER_CELL_ANODE_WIRE_VOLTAGE, _volume_) // 2.9 m by 40 mm cell
+        , _cell_(TRACKER_CELL_LENGTH, 0.5 * TRACKER_CELL_X, TRACKER_CELL_ANODE_WIRE_VOLTAGE, vector3<double>(TRACKER_CELL_X, TRACKER_CELL_Y, TRACKER_CELL_LENGTH), _volume_) // 2.9 m by 40 mm cell
         //, _volume_(3.0 * TRACKER_CELL_X, 3.0 * TRACKER_CELL_Y, 3.0 * TRACKER_CELL_LENGTH) // world volume
         //: _volume_(3.0 * TRACKER_CELL_X, 3.0 * TRACKER_CELL_Y, 3.0 * TRACKER_CELL_LENGTH) // world volume
     {
@@ -35,10 +35,14 @@ class World
     void DoEvent()
     {
         IonizationEvent event{_cell_.GenerateIonizationEvent(_generator_, _volume_)};
-        std::cout << event.GetPosition() << std::endl;
+        std::cout << "event.GetPosition() -> " << event.GetPosition() << std::endl;
         std::cout << "V " << _cell_.electric_potential(event.GetPosition()) << " [volts]" << std::endl;
 
-        // step the electron
+        // step the electronvoid
+
+
+        std::cout << "Press enter to continue..." << std::endl;
+        std::cin.get();
     }
 
 

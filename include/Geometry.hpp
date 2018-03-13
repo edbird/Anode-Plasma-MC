@@ -105,6 +105,11 @@ namespace Geometry
             return _radius_;
         }
 
+        double Length() const
+        {
+            return _length_;
+        }
+
         virtual
         bool PointIntersectionTest(vector3<double> point) const
         {
@@ -244,7 +249,34 @@ namespace Geometry
                         std::cout << __func__ << " return true; point=" << point << std::endl;
                         return true;
                     }
+                    else
+                    {
+                        std::cerr << "PointIntersectionTest: test Z failed: z=" << point.GetZ() << " range=[" << 0.0 << "," << _size_.GetZ() << "]";
+                        if(!(0.0 <= point.GetZ()))
+                            std::cerr << " !0.0 <= " << point.GetZ();
+                        if(!(point.GetZ() < _size_.GetZ()))
+                            std::cerr << " !" << point.GetZ() << " < " << _size_.GetZ();
+                        std::cerr << std::endl;
+                    }
                 }
+                else
+                {
+                    std::cerr << "PointIntersectionTest: test Y failed: y=" << point.GetY() << " range=[" << 0.0 << "," << _size_.GetY() << "]";
+                    if(!(0.0 <= point.GetY()))
+                        std::cerr << " !0.0 <= " << point.GetY();
+                    if(!(point.GetY() < _size_.GetY()))
+                        std::cerr << " !" << point.GetY() << " < " << _size_.GetY();
+                    std::cerr << std::endl;
+                }
+            }
+            else
+            {
+                std::cerr << "PointIntersectionTest: test X failed: x=" << point.GetX() << " range=[" << 0.0 << "," << _size_.GetX() << "]";
+                if(!(0.0 <= point.GetX()))
+                    std::cerr << " !0.0 <= " << point.GetX();
+                if(!(point.GetX() < _size_.GetX()))
+                    std::cerr << " !" << point.GetX() << " < " << _size_.GetX();
+                std::cerr << std::endl;
             }
 
             std::cout << __func__ << " return false; point=" << point << std::endl;

@@ -26,7 +26,7 @@ class Cell
     public:
 
     // volume is the world volume used for generating points for events
-    Cell(const double length, const double radius, const double anode_voltage, const vector3<double>& volume)
+    Cell(const double length, const double radius, const double anode_voltage, const vector3<double>& position, const vector3<double>& volume)
         //: _position_(0.0, 0.0, 0.0)
         //, _direction_(0.0, 0.0, 1.0) // anode wire points along z
         //: _length_{length}
@@ -40,12 +40,12 @@ class Cell
         DEBUG_MESSAGE(function_debug_arguments(__PRETTY_FUNCTION__, "volume", volume.String()));
 
         // set position of cube (volume of cell)
-        _cube_.SetPosition(vector3<double>(2.0 * radius, 2.0 * radius, length));
+        _cube_.SetPosition(position);
 
         init_wire(anode_voltage);
-        vector3<double> position(0.0, 0.0, 0.0);
-        position += _cube_.Position();
-        init_endcap(position, vector3<double>(0.0, 0.0, 1.0), CELL_ENDCAP_LENGTH, radius);
+        vector3<double> endcap_position(0.0, 0.0, 0.0);
+        endcap_position += _cube_.Position();
+        init_endcap(endcap_position, vector3<double>(0.0, 0.0, 1.0), CELL_ENDCAP_LENGTH, radius);
 
         // initialize the electric field
         init_electric_field();
@@ -112,6 +112,7 @@ class Cell
     }
 
     // convert radial distance from anode wire to voltage (electric potential)
+    // radial position is relative to the anode wire position
     double V_radiual(const double radial_position)
     {
         const double radius{_cube_.Size().GetX() / 2.0};
@@ -131,16 +132,28 @@ class Cell
         // TODO check solution exists
     }
 
+    // position is relative to the global origin
     double electric_potential(vector3<double> position)
     {
+        // TODO: should use get_placement_relative(), a function to convert
+        // to global position using a heirarchy of objects, eg; a cell contains
+        // a wire, and the position of the wire is relative to the cell
+        // so the position of the wire relative to the global origin is given
+        // by the sum
+        vector3<double> cell_position{_cube_.Position()};
         vector3<double> wire_position{_wire_anode_.GetCylinder().Position()};
         vector3<double> wire_direction{_wire_anode_.GetCylinder().Direction()};
-        vector3<double> delta_position{position - wire_position};
+        vector3<double> delta_position{position - (cell_position + wire_position)};
         // TODO: derive this algorithm and optimize
         double distance_along{dot(delta_position, wire_direction)};
         vector3<double> perpendicular{delta_position - distance_along * wire_direction};
         double perpendicular_distance{perpendicular.Length()};
 
+        std::cout << "wire_position=" << wire_position + cell_position << std::endl;
+        std::cout << "wire_direction=" << wire_direction << std::endl;
+        std::cout << "delta_position=" << delta_position << std::endl;
+        std::cout << "distance_along=" << distance_along << std::endl;
+        std::cout << "perpendicular=" << perpendicular << std::endl;
         std::cout << "perpendicular_distance=" << perpendicular_distance << std::endl;
 
         h_perpendicular_distance->Fill(perpendicular_distance);
@@ -197,9 +210,12 @@ class Cell
 
             if(_cube_.PointIntersectionTest(event_position))
             {
-                _histogram_group_.Ref("h_event_pos_x").Get().Fill(event_position.GetX());
-                _histogram_group_.Ref("h_event_pos_y").Get().Fill(event_position.GetY());
-                _histogram_group_.Ref("h_event_pos_z").Get().Fill(event_position.GetZ());
+                //_histogram_group_.Ref("h_event_pos_x").Ref().Fill(event_position.GetX());
+                //_histogram_group_.Ref("h_event_pos_y").Ref().Fill(event_position.GetY());
+                //_histogram_group_.Ref("h_event_pos_z").Ref().Fill(event_position.GetZ());
+                _histogram_group_.Ref("h_event_pos_x").Fill(event_position.GetX());
+                _histogram_group_.Ref("h_event_pos_y").Fill(event_position.GetY());
+                _histogram_group_.Ref("h_event_pos_z").Fill(event_position.GetZ());
 
                 break;
             }
@@ -223,9 +239,10 @@ class Cell
         // initialize ground wire vector
         _wire_ground_.clear();
 
-        vector3<double> position{_wire_anode_.GetCylinder().Position()};
+        vector3<double> position_origin{_wire_anode_.GetCylinder().Position()};
         vector3<double> direction{_wire_anode_.GetCylinder().Direction()};
-        double length{_cube_.Size().GetZ()};
+        //double length{_cube_.Size().GetZ()};
+        double length{_wire_anode_.GetCylinder().Length()};
         double radius{0.5 * _cube_.Size().GetX()};
 
         for(int y{-1}; y <= 1; ++ y)
@@ -235,8 +252,9 @@ class Cell
                 if(x == 0 && y == 0) continue;
 
                 //vector3<double> position{_position_};
-                const vector3<double> x_delta(0.5 * radius, 0.0, 0.0);
-                const vector3<double> y_delta(0.0, 0.5 * radius, 0.0);
+                const vector3<double> x_delta(radius, 0.0, 0.0);
+                const vector3<double> y_delta(0.0, radius, 0.0);
+                vector3<double> position{position_origin};
                 position += x * x_delta;
                 position += y * y_delta;
                 _wire_ground_.push_back(Wire(position, direction, length, WIRE_RADIUS, 0.0));
@@ -244,9 +262,10 @@ class Cell
         }
     }
 
-    void init_endcap(const vector3<double>& position, const vector3<double> direction, const double length, const double radius)
+    void init_endcap(vector3<double>& position, const vector3<double> direction, const double length, const double radius)
     {
         _endcap_0_.Init(position, direction, length, radius, 0.0);
+        position += vector3<double>(0.0, 0.0, length);
         _endcap_1_.Init(position, -direction, length, radius, 0.0); // TODO radius should be slightly smaller
     }
     
@@ -258,6 +277,7 @@ class Cell
     //double _radius_;
     Geometry::Cube _cube_; // cell volume
     const double _ACTIVE_RADIUS_FRACTION_{0.9}; // the active radius is 
+    // TODO
 
     Wire _wire_anode_;
     /*
