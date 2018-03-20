@@ -253,6 +253,7 @@ class ElectronicCharge
 
     public:
     static constexpr const double ELECTRON_CHARGE{-_electron_charge_fundamental_};
+    static constexpr const double ELECTRON_VOLT{_electron_charge_fundamental_};
 };
 
 
@@ -297,9 +298,23 @@ class Ion
 
     public:
 
-    Ion()
+    Ion(const double mass, const double charge)
+        : _mass_{mass}
+        , _charge_{charge}
     {
     }
+
+    Ion(const double mass, const double charge, const vector3<double> position, const vector3<double> momentum)
+        : _mass_{mass}
+        , _charge_{charge}
+        , _position_{position}
+        , _momentum_{momentum}
+    {
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // public functions
+    ////////////////////////////////////////////////////////////////////////////
 
     virtual
     double Charge() const
@@ -307,10 +322,112 @@ class Ion
         return _charge_;
     }
 
+    virtual
+    double Mass() const
+    {
+        return _mass_;
+    }
+
+    vector3<double> Momentum() const
+    {
+        return _momentum_;
+    }
+
+    vector3<double> Position() const
+    {
+        return _position_;
+    }
+
+    void SetMomentum(const vector3<double>& momentum)
+    {
+        _momentum_ = momentum;
+    }
+
+    void SetPosition(const vector3<double>& position)
+    {
+        _position_ = position;
+    }
+
+    double KE() 
+    {
+        calc_ke();
+        return _kinetic_energy_;
+    }
+
+    double Velocity() const
+    {
+        return velocity();
+    }
+
+    /*
+    double VelocitySquare() const
+    {
+        return velocity2();
+    }
+    */
+
+    // step function
+    // step particle forwards by distance length in direction of
+    // momentum and update momentum magnitude
+    // this is used to step the particle through when simulating collisions
+    // using exponentially distributed random variables
+    /*
+    void Step(const double length, const double potential_change)
+    {
+        std::cout << "_position_=" << _position_ << std::endl;
+        std::cout << "length=" << length << std::endl;
+        std::cout << "_momentum_=" << _momentum_ << std::endl;
+        std::cout << "Unit=" << _momentum_.Unit() << std::endl;
+        _position_ += length * _momentum_.Unit();
+        std::cout << "_position_=" << _position_ << std::endl;
+        double potential_energy_change = _charge_ * potential_change;
+        std::cout << "potential_energy_change=" << potential_energy_change << std::endl;
+        double kinetic_energy{KE() - potential_energy_change}; // subtract because -PE = +KE
+        std::cout << "_momentum_=" << _momentum_ << std::endl;
+        _momentum_ = std::sqrt(2.0 * kinetic_energy * _mass_) * _momentum_.Unit();
+        std::cout << "_momentum_=" << _momentum_ << std::endl;
+    }
+    */
+
+    void SetKE(const double kinetic_energy)
+    {
+        _momentum_ = std::sqrt(2.0 * kinetic_energy * _mass_) * _momentum_.Unit();
+    }
 
     private:
 
+    ////////////////////////////////////////////////////////////////////////////
+    // private functions
+    ////////////////////////////////////////////////////////////////////////////
+
+    void calc_ke()
+    {
+        _kinetic_energy_ = 0.5 * _mass_ * velocity2();
+    }
+
+    double velocity2() const
+    {
+        return ((1.0 / _mass_) * _momentum_).Mod2();
+    }
+
+    double velocity() const
+    {
+        return ((1.0 / _mass_) * _momentum_).Mod();
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // member variables
+    ////////////////////////////////////////////////////////////////////////////
+
+    // charge of ion
     double _charge_;
+    
+    // kinetic variables
+    // position, momentum and kinetic energy
+    double _mass_;
+    vector3<double> _position_;
+    vector3<double> _momentum_;
+    double _kinetic_energy_;
 
 };
 
@@ -320,8 +437,8 @@ class Electron : public Ion
 
     public:
 
-    Electron(const vector3<double> position, const double kinetic_energy)
-        : _position_{position}, _kinetic_energy_{kinetic_energy}
+    Electron(const double mass, const vector3<double> position, const vector3<double> momentum)
+        : Ion(mass, ElectronicCharge::ELECTRON_CHARGE, position, momentum)
     {
     }
 
@@ -329,11 +446,18 @@ class Electron : public Ion
     {
     }
 
+    // Note: charge variable is unused
+    /*
+    double Charge() const
+    {
+        return IonizationEvent::ELECTRON_CHARGE;
+    }
+    */
+
 
     private:
 
-    vector3<double> _position_;
-    double _kinetic_energy_;
+
 
 
 };

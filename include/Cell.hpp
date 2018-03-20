@@ -34,9 +34,12 @@ class Cell
         : _cube_(vector3<double>(2.0 * radius, 2.0 * radius, length))
         , _wire_anode_(vector3<double>(radius, radius, 0.0), vector3<double>(0.0, 0.0, 1.0), length, WIRE_RADIUS, anode_voltage)
         , _tfile_{new TFile("Cell_output.root", "recreate")}
-        , _histogram_group_(_tfile_, HistogramGroupProperties("", "."), HistogramProperties(100, 0.0, 1.0))
-        , properties("h_ionization_count_wrapper", 100, 0.0, 2.0e4)
+        , _histogram_group_(_tfile_, HistogramGroupProperties("", "./canvas"), HistogramProperties(100, 0.0, 1.0))
+        , properties("h_ionization_count_wrapper", 10, 0.0, 1.0e1)
         , h_ionization_count_wrapper(_tfile_, properties)
+        , h_total_ionization_count_wrapper(_tfile_, HistogramProperties("h_total_ionization_count", 20, 0.0, 20.0))
+        , h_exponential_wrapper(_tfile_, HistogramProperties("h_exponential_wrapper", 100, 0.0, 1.0e-1))
+        , h_ionization_position(_tfile_, HistogramProperties("h_ionization_position", 100, 0.0, 2.0 * radius))
     {
 
         DEBUG_MESSAGE(function_debug_arguments(__PRETTY_FUNCTION__, "volume", volume.String()));
@@ -77,20 +80,23 @@ class Cell
 
         h_event_initial_voltage = new TH1F("h_event_initial_voltage", "h_event_initial_voltage", 100, 0.0, 2000.0);
 
-        h_ionization_count = new TH1F("h_ionization_count", "h_ionization_count", 100, 0.0, 2.0e4);
+        //h_ionization_count = new TH1F("h_ionization_count", "h_ionization_count", 100, 0.0, 2.0e4);
     }
 
     ~Cell()
     {
         h_ionization_count_wrapper.Write();
         h_ionization_count_wrapper.Canvas();
+        
+        h_total_ionization_count_wrapper.Write();
+        h_total_ionization_count_wrapper.Canvas();
 
-        h_ionization_count->Write();
-        TCanvas* c_ionization_count = new TCanvas("c_ionization_count", "c_ionization_count", 800, 600);
-        c_ionization_count->SetLogy();
-        h_ionization_count->Draw();
-        c_ionization_count->SaveAs("c_ionization_count.png");
-        delete c_ionization_count; 
+
+        h_exponential_wrapper.Write();
+        h_exponential_wrapper.Canvas();
+
+        h_ionization_position.Write();
+        h_ionization_position.Canvas();
         
         h_event_initial_voltage->Write();
         TCanvas* c_event_initial_voltage = new TCanvas("c_event_initial_voltage", "c_event_initial_voltage", 800, 600);
@@ -268,7 +274,7 @@ class Cell
     }
 
     // position is relative to the global origin
-    double electric_potential(vector3<double> position)
+    double electric_potential(Generator& generator, vector3<double> position)
     {
         // TODO: should use get_placement_relative(), a function to convert
         // to global position using a heirarchy of objects, eg; a cell contains
@@ -298,34 +304,119 @@ class Cell
         double voltage{V_radial(perpendicular_distance)};
         h_event_initial_voltage->Fill(voltage);
         // solve to find radial position of next ionization event
-        double next_radial{0.0};
-        double next_energy;
+        //double next_radial{0.0};
+        //double next_energy;
 
         // https://physics.nist.gov/PhysRefData/Handbook/Tables/heliumtable1.htm
         const double HELIUM_IONIZATION_ENERGY{24.587387}; // eV 
-        double ionization_energy{85.7}; // fake ionization energy eV //{HELIUM_IONIZATION_ENERGY};
-        int ionization_count{0};
+        const double ionization_energy_ev{85.7}; // eV
+        const double ionization_energy{85.7 * ElectronicCharge::ELECTRON_VOLT}; // fake ionization energy eV //{HELIUM_IONIZATION_ENERGY};
+        //int ionization_count{0};
 
-        // structure containing radial positions of electrons
-        std::vector<double> electron_radial_position;
-        // put the ionization position into this structure
-        // contains "a single electron"
-        electron_radial_position.push_back(perpendicular_distance);
+        // He mean free path for electrons
+        //const double HELIUM_MEAN_FREE_PATH{1.0e-6}; // 1 um
+        const double HELIUM_MEAN_FREE_PATH{1.0e-2}; // change to mean of ~ 100 steps
 
-        // electron energy
-        std::vector<double> electron_energy;
-        electron_energy.push_back(0.0); // initially no energy
+        // structure containing electrons and properties
+        const double electron_mass{9.10938356e-31};
+        std::vector<Electron> electron;
+        // TODO: position is not a true position, using x value as radial
+        // distance
+        // kinetic energy = 0.0
+        // momentum is zero
+        electron.push_back(Electron(electron_mass, vector3<double>(perpendicular_distance, 0.0, 0.0), vector3<double>(0.0, 0.0, 0.0)));
 
         // process all electrons
-        //std::vector<double>::iterator it{electron_radial_position.begin()};
-        //for(; it != electron_radial_position.end(); ++ it)
-        // NOTE: do not use iterator as vector is reallocated!
-        for(std::size_t ix{0}; ix < electron_radial_position.size(); ++ ix)
+        for(std::size_t ix{0}; ix < electron.size(); ++ ix)
         {
+            //std::cout << "electron " << ix + 1 << " of " << electron.size() << std::endl;
+
+            // count number of new ionization events
+            std::size_t ionization_count{0};
+            
+            const double initial_position{electron[ix].Position().GetX()};
+            //std::cout << "initial potential energy is " << _wire_anode_.GetVoltage() - V_radial(initial_position) << " which is enough for " << (int)((_wire_anode_.GetVoltage() - V_radial(initial_position)) / ionization_energy_ev) <<  " ionization events" << std::endl;
+
+
+            // loop until electron reaches anode wire
+            for(;;)
+            {
+
+                // draw exponentially distributed random number
+                double distance{generator.GetRandomExponential(1.0 / HELIUM_MEAN_FREE_PATH)};
+                h_exponential_wrapper.Ref().Fill(distance);
+
+                // initial and final radial positions
+                double initial_position{electron[ix].Position().GetX()};
+                double next_position{initial_position - distance};
+
+                if(next_position < _wire_anode_.GetCylinder().Radius())
+                {
+                    break;
+                }
+
+                // calculate potential_drop
+                double initial_potential{V_radial(initial_position)};
+                double next_potential{V_radial(next_position)};
+                double potential_change{next_potential - initial_potential};
+                //DEBUG_MESSAGE(function_debug_locals(__PRETTY_FUNCTION__, "initial_p", initial_potential, "next_p", next_potential));
+                //std::cout << "potential_change=" << potential_change << std::endl;
+
+                // move electron to this radial position
+                //electron[ix].Step(distance, potential_change);
+                electron[ix].SetPosition(vector3<double>(next_position, 0.0, 0.0));
+                double potential_energy_change{electron[ix].Charge() * potential_change};
+                double intermediate_kinetic_energy{electron[ix].KE() - potential_energy_change};
+                
+                // only required for debug statement
+                double intermediate_momentum_magnitude{std::sqrt(2.0 * intermediate_kinetic_energy * electron[ix].Mass())};
+                electron[ix].SetMomentum(intermediate_momentum_magnitude * vector3<double>(-1.0, 0.0, 0.0));
+                //std::cout << "distance=" << distance << " delta_potential=" << potential_change << " eV ke=" << electron[ix].KE() / ElectronicCharge::ELECTRON_VOLT << " eV" << std::endl;
+
+                // check if kinetic energy is great enough to ionize
+                // convert to SI unit
+                if(intermediate_kinetic_energy >= ionization_energy)
+                {
+                    h_ionization_position.Ref().Fill(initial_position);
+
+                    // TODO: correct collision formula
+
+                    // set kinetic energy to half the remaining energy after ionization
+                    double next_kinetic_energy{0.5 * (intermediate_kinetic_energy - ionization_energy)};
+                    double next_momentum_magnitude{std::sqrt(2.0 * next_kinetic_energy * electron[ix].Mass())};
+
+                    electron[ix].SetMomentum(next_momentum_magnitude * vector3<double>(-1.0, 0.0, 0.0));
+
+                    // next position and momentum for new electron created in ionization process
+                    vector3<double> next_momentum{electron[ix].Momentum()};
+                    vector3<double> next_position{electron[ix].Position()};
+
+                    // add new electron to vector
+                    electron.push_back(Electron(electron_mass, next_position, next_momentum));
+
+                    ++ ionization_count;
+
+                    //std::cout << "ionization event ke=" << electron[ix].KE() / ElectronicCharge::ELECTRON_VOLT << " eV" << std::endl;
+                }
+
+
+                //std::cin.get();
+            }
+
+            h_ionization_count_wrapper.Ref().Fill(ionization_count);
+
+            //std::cout << "ionization_count=" << ionization_count << std::endl;
+            //std::cin.get();
+
+
+
+            /*
             // set the initial radial value of this electron
             //double initial_radial{*it};
-            double initial_radial{electron_radial_position[ix]};
-            double initial_energy{electron_energy[ix]};
+            //double initial_radial{electron_radial_position[ix]};
+            //double initial_energy{electron_energy[ix]};
+            double initial_radial{electron[ix].Position().Mod()};
+            double initial_energy{electron[ix].KE()};
             //std::cout << "initial_radial=" << initial_radial << std::endl;
             //std::cin.get();
 
@@ -338,7 +429,7 @@ class Cell
             {
                 // if there was a solution, then an ionization event occured
                 // TODO: store the kinetic energy / velocity as well as position
-                ++ ionization_count;
+                //++ ionization_count;
                 //std::cout << "next ionization occurs at position: " << next_radial << std::endl;
 
                 // compute remaining energy
@@ -346,8 +437,11 @@ class Cell
                 //energy_gain = 0.0;
 
                 // add new electron to vector at this position
-                electron_radial_position.push_back(next_radial);
-                electron_energy.push_back(next_energy);
+                //electron_radial_position.push_back(next_radial);
+                //electron_energy.push_back(next_energy);
+                vector3<double> next_momentum(-1.0, 0.0, 0.0);
+                next_momentum *= std::sqrt(2.0 * next_energy * electron_mass);
+                electron.push_back(Electron(electron_mass, vector3<double>(next_radial, 0.0, 0.0), next_momentum));
 
                 // reset the while loop, try to find another solution
                 initial_radial = next_radial;
@@ -362,11 +456,10 @@ class Cell
             //std::cout << "NEXT ELECTRON" << std::endl;
         
             //std::cout << "electron: ix=" << ix << " ionization_count=" << ionization_count << std::endl;
+            */
         }
 
-        h_ionization_count->Fill(ionization_count);
-
-        h_ionization_count_wrapper.Ref().Fill(ionization_count);
+        h_total_ionization_count_wrapper.Ref().Fill(electron.size() - 1);
 
         return voltage;
 
@@ -524,9 +617,12 @@ class Cell
     
     mutable TH1F *h_event_initial_voltage;
 
-    mutable TH1F *h_ionization_count;
+    //mutable TH1F *h_ionization_count;
     HistogramProperties properties;
     HistogramWrapperFloat h_ionization_count_wrapper;
+    HistogramWrapperFloat h_total_ionization_count_wrapper;
+    HistogramWrapperFloat h_exponential_wrapper;
+    HistogramWrapperFloat h_ionization_position;
 
 };
 

@@ -37,7 +37,7 @@ class World
         IonizationEvent event{_cell_.GenerateIonizationEvent(_generator_, _volume_)};
         //std::cout << "event.GetPosition() -> " << event.GetPosition() << std::endl;
         //std::cout << "V " << _cell_.electric_potential(event.GetPosition()) << " [volts]" << std::endl;
-        _cell_.electric_potential(event.GetPosition());
+        _cell_.electric_potential(_generator_, event.GetPosition());
         // TODO: some of these print zero why?
 
         // step the electronvoid
