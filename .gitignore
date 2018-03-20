@@ -2,6 +2,7 @@
 *.png
 *.C
 *.pdf
+*.root
 
 # Prerequisites
 *.d
